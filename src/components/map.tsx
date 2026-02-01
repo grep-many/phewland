@@ -1,5 +1,6 @@
 import { MapGLB } from "@/assets";
 import { useGLTF } from "@react-three/drei";
+import { RigidBody } from "@react-three/rapier";
 import React from "react";
 import * as THREE from "three";
 
@@ -13,9 +14,13 @@ export const Map = () => {
         child.receiveShadow = true;
       }
     });
-  }, []);
+  }, [map.scene]);
 
-  return <primitive object={map.scene} />;
+  return (
+    <RigidBody colliders="trimesh" type="fixed">
+      <primitive object={map.scene} />;
+    </RigidBody>
+  );
 };
 
 useGLTF.preload(MapGLB);
