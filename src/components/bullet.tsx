@@ -1,7 +1,7 @@
 import { RapierRigidBody, RigidBody, vec3 } from "@react-three/rapier";
 import React from "react";
 import { MeshBasicMaterial, Vector3 } from "three";
-import { WEAPON_OFFSET } from "./character-controller";
+import { WEAPON_OFFSET } from "@/assets";
 import { isHost } from "playroomkit";
 
 type Props = TypeBullet & {
@@ -29,7 +29,7 @@ export const Bullet = ({ player, angle, position, onHit }: Props) => {
     };
 
     rigidBodyRef.current.setLinvel(velocity, true);
-  }, []);
+  }, [angle]);
 
   return (
     <group position={[position.x, position.y, position.z]} rotation-y={angle}>

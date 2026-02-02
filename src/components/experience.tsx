@@ -74,11 +74,11 @@ export const Experience = () => {
   /** NETWORK SYNC */
   useEffect(() => {
     if (isHost()) setNetworkBullets(bullets);
-  }, [bullets]);
+  }, [bullets, setNetworkBullets]);
 
   useEffect(() => {
     if (isHost()) setNetworkHits(hits);
-  }, [hits]);
+  }, [hits, setNetworkHits]);
 
   /** PLAYER JOIN LOGIC */
   useEffect(() => {

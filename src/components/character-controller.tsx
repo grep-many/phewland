@@ -23,8 +23,6 @@ const MOVE_SPEED = 6;
 const TURN_SPEED = 12;
 const FIRE_RATE = 380;
 
-export const WEAPON_OFFSET = { x: -0.2, y: 1.4, z: 0.8 };
-
 export const CharacterController = ({
   state,
   userPlayer,
