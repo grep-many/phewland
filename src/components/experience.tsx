@@ -34,6 +34,12 @@ export const Experience = () => {
     setBullets((bullets) => bullets.filter((bullet) => bullet.id !== bulletId));
   };
 
+  const onKilled = (_victim: string, killer: string) => {
+    const killerState = players.find((p) => p.state.id === killer);
+    if (!killerState) return;
+    killerState.state.setState("kills", killerState.state.getState("kills") + 1);
+  };
+
   React.useEffect(() => {
     setNetworkBullets(bullets);
   }, [bullets]);
@@ -49,7 +55,7 @@ export const Experience = () => {
 
       const newPlayer = { state, joystick };
       state.setState("health", 100);
-      state.setState("death", 0);
+      state.setState("deaths", 0);
       state.setState("kills", 0);
       setPlayers((players) => {
         if (players.some((p) => p.state.id === state.id)) {
@@ -79,14 +85,14 @@ export const Experience = () => {
         shadow-radius={6}
       />
       <Map />
-      {players.map(({ state, joystick }, idx) => (
+      {players.map(({ state, joystick }) => (
         <CharacterController
           key={state.id}
-          position-x={idx * 2}
           state={state}
           joystick={joystick}
           userPlayer={state.id === myPlayer().id}
           onFire={onFire}
+          onKilled={(killer) => onKilled(state.id, killer)}
         />
       ))}
 

@@ -3,15 +3,17 @@ import { type Group } from "three";
 import { CharacterSoldier } from "./character-soldier";
 import { isHost, type Joystick, type PlayerState } from "playroomkit";
 import { CapsuleCollider, RapierRigidBody, RigidBody, vec3 } from "@react-three/rapier";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls } from "@react-three/drei";
 import { Crosshair } from "./crosshair";
+import { PlayerInfo } from "./player-info";
 
 type Props = React.JSX.IntrinsicElements["group"] & {
   state: PlayerState;
   userPlayer: boolean;
   joystick: Joystick;
   onFire: (newBullet: TypeBullet) => void;
+  onKilled: (id: string, userData: RigidBodyUserData["player"]) => void;
 };
 
 const MOVEMENT_SPEED = 200;
@@ -23,7 +25,14 @@ export const WEAPON_OFFSET = {
   z: 1.4,
 };
 
-export const CharacterController = ({ state, userPlayer, joystick, onFire, ...props }: Props) => {
+export const CharacterController = ({
+  state,
+  userPlayer,
+  joystick,
+  onFire,
+  onKilled,
+  ...props
+}: Props) => {
   const groupRef = React.useRef<Group>(null);
   const characterRef = React.useRef<Group>(null);
   const rigidBodyRef = React.useRef<RapierRigidBody>(null);
@@ -31,6 +40,28 @@ export const CharacterController = ({ state, userPlayer, joystick, onFire, ...pr
   const lastShootRef = React.useRef<number>(0);
 
   const [animation, setAnimation] = React.useState("Idle");
+
+  const scene = useThree((state) => state.scene);
+  const spawnRandomly = () => {
+    if (!rigidBodyRef?.current) return;
+    const spawns = [];
+
+    for (let i = 0; i < 1000; i++) {
+      const spawn = scene.getObjectByName(`spawn_${i}`);
+      if (spawn) {
+        spawns.push(spawn);
+      } else {
+        break;
+      }
+    }
+
+    const spawnPos = spawns[Math.floor(Math.random() * spawns.length)].position;
+    rigidBodyRef.current.setTranslation(spawnPos, true);
+  };
+
+  React.useEffect(() => {
+    spawnRandomly();
+  }, []);
 
   useFrame((_, delta) => {
     if (!rigidBodyRef?.current || !characterRef?.current || !cameraControlsRef?.current) return;
@@ -47,6 +78,8 @@ export const CharacterController = ({ state, userPlayer, joystick, onFire, ...pr
       playerWorldPos.z,
       true,
     );
+
+    if (state.getState("dead")) return setAnimation("Death");
 
     const angle = joystick.angle();
     if (joystick.isJoystickPressed() && angle) {
@@ -104,27 +137,25 @@ export const CharacterController = ({ state, userPlayer, joystick, onFire, ...pr
         lockRotations
         type={isHost() ? "dynamic" : "kinematicPosition"}
         onIntersectionEnter={({ other }) => {
-          if (
-            isHost() &&
-            other.rigidBody?.userData.type === "bullet" &&
-            state.getState("health") > 0
-          ) {
-            const newHealth = state.getState("health") - other.rigidBody.userData.damage;
-            if (newHealth <= 0) {
-              state.setState("death", state.getState("deaths") + 1);
-              state.setState("dead", true);
-              state.setState("health", 0);
-              rigidBodyRef.current?.setEnabled(false);
-              setTimeout(() => {
-                spawnRandomly();
-                rigidBodyRef.current?.setEnabled(true);
-                state.setState("health", 100);
-                state.setState("dead", false);
-              }, 2000);
-            }
+          const userData = other.rigidBody?.userData as RigidBodyUserData;
+          if (isHost() && userData.type === "bullet" && state.getState("health") > 0) {
+            const newHealth = state.getState("health") - userData.damage;
+            if (newHealth > 0) return state.setState("health", newHealth);
+            state.setState("deaths", state.getState("deaths") + 1);
+            state.setState("dead", true);
+            state.setState("health", 0);
+            rigidBodyRef.current?.setEnabled(false);
+            setTimeout(() => {
+              spawnRandomly();
+              rigidBodyRef.current?.setEnabled(true);
+              state.setState("health", 100);
+              state.setState("dead", false);
+            }, 2000);
+            onKilled(state.id, userData.player);
           }
         }}
       >
+        <PlayerInfo player={state} />
         <group ref={characterRef}>
           <CharacterSoldier color={state.getState("profile")?.color} animation={animation} />
           {userPlayer && (

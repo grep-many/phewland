@@ -9,7 +9,7 @@ declare global {
   };
   type RigidBodyUserData = {
     type: "bullet" | "player" | "environment";
-    player?: string;
-    damage?: number;
+    player: string;
+    damage: number;
   };
 }

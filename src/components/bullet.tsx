@@ -2,6 +2,7 @@ import { RapierRigidBody, RigidBody } from "@react-three/rapier";
 import React from "react";
 import { MeshBasicMaterial } from "three";
 import { WEAPON_OFFSET } from "./character-controller";
+import { isHost } from "playroomkit";
 
 type Props = TypeBullet & {
   onHit: (bulletId: TypeBullet["id"]) => void;
@@ -39,8 +40,13 @@ export const Bullet = ({ player, angle, position, onHit, id }: Props) => {
           sensor
           onCollisionEnter={() => onHit(id)}
           onCollisionExit={() => onHit(id)}
-          onIntersectionEnter={() => onHit(id)}
-          onIntersectionExit={() => onHit(id)}
+          onIntersectionEnter={(e) => {
+            if (isHost() && (e.other.rigidBody?.userData as RigidBodyUserData).type !== "bullet") {
+              rigidBodyRef.current?.setEnabled(false);
+              // onHit(vec3(rigidBodyRef.current?.translation()));
+              onHit(id);
+            }
+          }}
           userData={{
             type: "bullet",
             player,
