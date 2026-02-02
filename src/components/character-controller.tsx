@@ -10,6 +10,8 @@ import { Crosshair } from "./crosshair";
 import { PlayerInfo } from "./player-info";
 import { useKeyboard } from "@/hooks";
 
+import { DeadMP3, HurtMP3, RifleMP3 } from "@/assets";
+
 type Props = React.JSX.IntrinsicElements["group"] & {
   state: PlayerState;
   userPlayer: boolean;
@@ -44,6 +46,38 @@ export const CharacterController = ({
   const moveDir = React.useRef(new Vector3());
   const [animation, setAnimation] = React.useState("Idle");
 
+  /* ---------------- Audio ---------------- */
+  // Multiple audio support for overlapping shots
+  const rifleAudios = React.useRef<HTMLAudioElement[]>([]);
+  const hurtAudios = React.useRef<HTMLAudioElement[]>([]);
+  const deadAudios = React.useRef<HTMLAudioElement[]>([]);
+
+  const playAudio = (audioFile: string, store: React.MutableRefObject<HTMLAudioElement[]>) => {
+    const audio = new Audio(audioFile);
+    audio.currentTime = 0;
+    audio.play();
+    store.current.push(audio);
+
+    // Remove from array when finished
+    audio.addEventListener("ended", () => {
+      store.current = store.current.filter((a) => a !== audio);
+    });
+
+    return audio;
+  };
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      rifleAudios.current.forEach((a) => a.pause());
+      hurtAudios.current.forEach((a) => a.pause());
+      deadAudios.current.forEach((a) => a.pause());
+      rifleAudios.current = [];
+      hurtAudios.current = [];
+      deadAudios.current = [];
+    };
+  }, []);
+
   /* ---------------- Spawn ---------------- */
   const spawnPoints = React.useMemo(() => {
     const points = [];
@@ -74,9 +108,8 @@ export const CharacterController = ({
     const dead = state.getState("dead");
     const angle = joystick.angle();
 
-    // Compute once
     const moving = joystick.isJoystickPressed() && angle !== null;
-    const shooting = joystick.isPressed("bullet") || (userPlayer && keyboard.shoot);
+    const localShooting = joystick.isPressed("bullet") || (userPlayer && keyboard.shoot);
 
     /* ---------- Camera (local player) ---------- */
     if (userPlayer && cameraRef.current) {
@@ -115,8 +148,8 @@ export const CharacterController = ({
 
       state.setState("pos", body.translation());
 
-      // Shooting
-      if (shooting) {
+      // Shooting (host authoritative)
+      if (localShooting) {
         const now = Date.now();
         if (now - lastShoot.current > FIRE_RATE) {
           lastShoot.current = now;
@@ -126,6 +159,8 @@ export const CharacterController = ({
             angle: character.rotation.y,
             player: state.id,
           });
+          // Play overlapping rifle audio
+          playAudio(RifleMP3, rifleAudios);
         }
       }
     } else {
@@ -138,7 +173,7 @@ export const CharacterController = ({
 
     /* ---------- Animation ---------- */
     let next = "Idle";
-    if (shooting) next = moving ? "Run_Shoot" : "Idle_Shoot";
+    if (localShooting) next = moving ? "Run_Shoot" : "Idle_Shoot";
     else if (moving) next = "Run";
     setAnimation((a) => (a === next ? a : next));
   });
@@ -173,15 +208,22 @@ export const CharacterController = ({
             if (hp <= 0) return;
 
             const nextHp = hp - data.damage;
+
             if (nextHp > 0) {
               state.setState("health", nextHp);
+              // Play overlapping hurt audio
+              playAudio(HurtMP3, hurtAudios);
               return;
             }
 
+            // Player dies
             state.setState("dead", true);
             state.setState("health", 0);
             state.setState("deaths", state.getState("deaths") + 1);
             bodyRef.current?.setEnabled(false);
+
+            // Play overlapping death audio
+            playAudio(DeadMP3, deadAudios);
 
             setTimeout(() => {
               spawn();

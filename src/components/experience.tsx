@@ -42,7 +42,7 @@ export const Experience = () => {
       setBullets((prev) => prev.filter((b) => b.id !== newBullet.id));
     }, 2000);
   };
-  
+
   /** BULLET HIT */
   const onHit = (bulletId: string, position: Vector3) => {
     if (!isHost()) return;
@@ -59,8 +59,7 @@ export const Experience = () => {
     setTimeout(() => {
       setHits((prev) => prev.filter((h) => h.id !== hitId));
     }, 500);
-  };  
-  
+  };
 
   /** KILL HANDLER */
   const onKilled = (killerId: string) => {
@@ -80,7 +79,6 @@ export const Experience = () => {
   useEffect(() => {
     if (isHost()) setNetworkHits(hits);
   }, [hits]);
-  
 
   /** PLAYER JOIN LOGIC */
   useEffect(() => {

@@ -9,7 +9,7 @@ import { Loader } from "@react-three/drei";
 
 const App = () => (
   <>
-    <Loader/>
+    <Loader />
     <Leaderboard />
     <Canvas
       shadows
