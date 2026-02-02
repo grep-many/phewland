@@ -1,10 +1,18 @@
 import { Environment } from "@react-three/drei";
 import { Map } from "./map";
 import React from "react";
-import { insertCoin, Joystick, myPlayer, onPlayerJoin, type PlayerState } from "playroomkit";
+import {
+  insertCoin,
+  isHost,
+  Joystick,
+  myPlayer,
+  onPlayerJoin,
+  useMultiplayerState,
+  type PlayerState,
+} from "playroomkit";
 import { FirePNG } from "@/assets";
 import { CharacterController } from "./character-controller";
-import {Bullet} from "./bullet";
+import { Bullet } from "./bullet";
 
 interface Player {
   state: PlayerState;
@@ -13,6 +21,7 @@ interface Player {
 export const Experience = () => {
   const [players, setPlayers] = React.useState<Player[]>([]);
   const [bullets, setBullets] = React.useState<TypeBullet[]>([]);
+  const [networkBullets, setNetworkBullets] = useMultiplayerState<TypeBullet[]>("bullet", []);
 
   const onFire = (newbullet: TypeBullet) => {
     setBullets(
@@ -26,11 +35,16 @@ export const Experience = () => {
   };
 
   React.useEffect(() => {
+    setNetworkBullets(bullets);
+  }, [bullets]);
+
+  React.useEffect(() => {
     (async () => await insertCoin())();
+
     onPlayerJoin((state) => {
       const joystick = new Joystick(state, {
         type: "angular",
-        buttons: [{ id: "phew", icon: FirePNG }],
+        buttons: [{ id: "bullet", icon: FirePNG }],
       });
 
       const newPlayer = { state, joystick };
@@ -76,7 +90,7 @@ export const Experience = () => {
         />
       ))}
 
-      {bullets.map((bullet) => (
+      {(isHost() ? bullets : networkBullets).map((bullet) => (
         <Bullet key={bullet.id} {...bullet} onHit={() => onHit(bullet.id)} />
       ))}
       <Environment preset="sunset" />

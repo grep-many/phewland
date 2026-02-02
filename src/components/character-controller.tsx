@@ -27,24 +27,25 @@ export const CharacterController = ({ state, userPlayer, joystick, onFire, ...pr
   const groupRef = React.useRef<Group>(null);
   const characterRef = React.useRef<Group>(null);
   const rigidBodyRef = React.useRef<RapierRigidBody>(null);
-  const CameraControlsRef = React.useRef<CameraControls>(null);
+  const cameraControlsRef = React.useRef<CameraControls>(null);
   const lastShootRef = React.useRef<number>(0);
 
   const [animation, setAnimation] = React.useState("Idle");
 
   useFrame((_, delta) => {
-    if (!rigidBodyRef?.current || !characterRef?.current || !CameraControlsRef?.current) return;
+    if (!rigidBodyRef?.current || !characterRef?.current || !cameraControlsRef?.current) return;
     const cameraDistanceY = window.innerWidth < 1024 ? 16 : 20;
     const cameraDistanceZ = window.innerWidth < 1024 ? 12 : 16;
     const playerWorldPos = vec3(rigidBodyRef.current.translation());
 
-    CameraControlsRef.current.setLookAt(
+    cameraControlsRef.current.setLookAt(
       playerWorldPos.x,
       playerWorldPos.y + state.getState("dead") ? 12 : cameraDistanceY,
       playerWorldPos.z + state.getState("dead") ? 12 : cameraDistanceZ,
       playerWorldPos.x,
       playerWorldPos.y + 1.5,
       playerWorldPos.z,
+      true,
     );
 
     const angle = joystick.angle();
@@ -63,8 +64,8 @@ export const CharacterController = ({ state, userPlayer, joystick, onFire, ...pr
       setAnimation("Idle");
     }
 
-    if (joystick.isPressed("phew")) {
-      if (joystick.angle()&&joystick.isJoystickPressed()) {
+    if (joystick.isPressed("bullet")) {
+      if (joystick.angle() && joystick.isJoystickPressed()) {
         setAnimation("Run_Shoot");
       } else {
         setAnimation("Idle_Shoot");
@@ -95,13 +96,34 @@ export const CharacterController = ({ state, userPlayer, joystick, onFire, ...pr
 
   return (
     <group ref={groupRef} {...props}>
-      {userPlayer && <CameraControls ref={CameraControlsRef} />}
+      {userPlayer && <CameraControls ref={cameraControlsRef} />}
       <RigidBody
         ref={rigidBodyRef}
         colliders={false}
         linearDamping={12}
         lockRotations
         type={isHost() ? "dynamic" : "kinematicPosition"}
+        onIntersectionEnter={({ other }) => {
+          if (
+            isHost() &&
+            other.rigidBody?.userData.type === "bullet" &&
+            state.getState("health") > 0
+          ) {
+            const newHealth = state.getState("health") - other.rigidBody.userData.damage;
+            if (newHealth <= 0) {
+              state.setState("death", state.getState("deaths") + 1);
+              state.setState("dead", true);
+              state.setState("health", 0);
+              rigidBodyRef.current?.setEnabled(false);
+              setTimeout(() => {
+                spawnRandomly();
+                rigidBodyRef.current?.setEnabled(true);
+                state.setState("health", 100);
+                state.setState("dead", false);
+              }, 2000);
+            }
+          }
+        }}
       >
         <group ref={characterRef}>
           <CharacterSoldier color={state.getState("profile")?.color} animation={animation} />

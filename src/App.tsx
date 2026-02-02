@@ -8,7 +8,7 @@ import { Bloom, EffectComposer } from "@react-three/postprocessing";
 const App = () => (
   <Canvas
     shadows
-    camera={{ position: [0, 30, 0], fov: 30 ,near:2}}
+    camera={{ position: [0, 30, 0], fov: 30, near: 2 }}
     onCreated={(state) => {
       state.gl.shadowMap.enabled = true;
       state.gl.shadowMap.type = PCFSoftShadowMap;
@@ -21,7 +21,7 @@ const App = () => (
       </Physics>
     </React.Suspense>
     <EffectComposer enableNormalPass={false}>
-      <Bloom  luminanceThreshold={1} intensity={ 1.5} minmapBlur />
+      <Bloom luminanceThreshold={1} intensity={1.5} minmapBlur />
     </EffectComposer>
   </Canvas>
 );

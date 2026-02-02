@@ -36,8 +36,11 @@ export const Bullet = ({ player, angle, position, onHit, id }: Props) => {
         <RigidBody
           ref={rigidBodyRef}
           gravityScale={0}
+          sensor
           onCollisionEnter={() => onHit(id)}
           onCollisionExit={() => onHit(id)}
+          onIntersectionEnter={() => onHit(id)}
+          onIntersectionExit={() => onHit(id)}
           userData={{
             type: "bullet",
             player,
