@@ -38,8 +38,6 @@ export const Bullet = ({ player, angle, position, onHit}: Props) => {
           ref={rigidBodyRef}
           gravityScale={0}
           sensor
-          onCollisionEnter={() => onHit(vec3(rigidBodyRef.current?.translation()))}
-          onCollisionExit={() => onHit(vec3(rigidBodyRef.current?.translation()))}
           onIntersectionEnter={(e) => {
             if (isHost() && (e.other.rigidBody?.userData as RigidBodyUserData).type !== "bullet") {
               rigidBodyRef.current?.setEnabled(false);

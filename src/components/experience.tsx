@@ -1,6 +1,11 @@
+import { useEffect, useState } from "react";
 import { Environment } from "@react-three/drei";
 import { Map } from "./map";
-import React from "react";
+import { CharacterController } from "./character-controller";
+import { Bullet } from "./bullet";
+import { BulletHit } from "./bullet-hit";
+import { FirePNG } from "@/assets";
+
 import {
   insertCoin,
   isHost,
@@ -10,54 +15,67 @@ import {
   useMultiplayerState,
   type PlayerState,
 } from "playroomkit";
-import { FirePNG } from "@/assets";
-import { CharacterController } from "./character-controller";
-import { Bullet } from "./bullet";
+
 import type { Vector3 } from "three";
-import { BulletHit } from "./bullet-hit";
 
 interface Player {
   state: PlayerState;
   joystick: Joystick;
 }
+
 export const Experience = () => {
-  const [players, setPlayers] = React.useState<Player[]>([]);
-  const [bullets, setBullets] = React.useState<TypeBullet[]>([]);
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [bullets, setBullets] = useState<TypeBullet[]>([]);
+  const [hits, setHits] = useState<TypeBulletHit[]>([]);
+
   const [networkBullets, setNetworkBullets] = useMultiplayerState<TypeBullet[]>("bullets", []);
-  const [hits, setHits] = React.useState<TypeBulletHit[]>([]);
   const [networkHits, setNetworkHits] = useMultiplayerState<TypeBulletHit[]>("hits", []);
 
-  const onFire = (newbullet: TypeBullet) => {
-    setBullets(
-      (bullets) =>
-        bullets.some((bullet) => bullet.id === newbullet.id) ? bullets : [...bullets, newbullet], //bullets with same id should not be registered
-    );
+  /** FIRE BULLET */
+  const onFire = (newBullet: TypeBullet) => {
+    setBullets((prev) => (prev.some((b) => b.id === newBullet.id) ? prev : [...prev, newBullet]));
+
+    // Auto-expire bullet after 2 seconds
+    setTimeout(() => {
+      setBullets((prev) => prev.filter((b) => b.id !== newBullet.id));
+    }, 2000);
   };
 
+  /** BULLET HIT */
   const onHit = (bulletId: string, position: Vector3) => {
-    setBullets((bullets) => bullets.filter((bullet) => bullet.id !== bulletId));
-    setHits((hits) => [...hits, { id: bulletId, position }]);
+    // Remove the bullet immediately
+    setBullets((prev) => prev.filter((b) => b.id !== bulletId));
+
+    const newHit: TypeBulletHit = { id: bulletId, position };
+    setHits((prev) => [...prev, newHit]);
+
+    // Auto-remove hit after 0.5s
+    setTimeout(() => {
+      setHits((prev) => prev.filter((hit) => hit.id !== bulletId));
+    }, 500);
   };
 
-  const onHitEnded = (hitId: TypeBulletHit["id"]) => {
-    setHits((hits) => hits.filter((hit) => hit.id !== hitId));
+  /** KILL HANDLER */
+  const onKilled = (killerId: string) => {
+    // if(killerId===victimId) return
+    const killerState = players.find((p) => p.state.id === killerId)?.state;
+    if (killerState) {
+      const kills = killerState.getState("kills") || 0;
+      killerState.setState("kills", kills + 1);
+    }
   };
 
-  const onKilled = (_victim: string, killer: string) => {
-    const killerState = players.find((p) => p.state.id === killer);
-    if (!killerState) return;
-    killerState.state.setState("kills", killerState.state.getState("kills") + 1);
-  };
-
-  React.useEffect(() => {
+  /** NETWORK SYNC */
+  useEffect(() => {
     setNetworkBullets(bullets);
-  }, [bullets]);
+  }, [bullets, setNetworkBullets]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setNetworkHits(hits);
-  }, [hits]);
+  }, [hits, setNetworkHits]);
 
-  React.useEffect(() => {
+  /** PLAYER JOIN LOGIC */
+  useEffect(() => {
     (async () => await insertCoin())();
 
     onPlayerJoin((state) => {
@@ -67,21 +85,24 @@ export const Experience = () => {
         keyboard: true,
       });
 
-      const newPlayer = { state, joystick };
+      const newPlayer: Player = { state, joystick };
       state.setState("health", 100);
-      state.setState("deaths", 0);
       state.setState("kills", 0);
+      state.setState("deaths", 0);
 
-      setPlayers((players) =>
-        players.some((p) => p.state.id === state.id) ? players : [...players, newPlayer],
+      setPlayers((prev) =>
+        prev.some((p) => p.state.id === state.id) ? prev : [...prev, newPlayer],
       );
 
-      state.onQuit(() => setPlayers((players) => players.filter((p) => p.state.id !== state.id)));
+      state.onQuit(() => {
+        setPlayers((prev) => prev.filter((p) => p.state.id !== state.id));
+      });
     });
   }, []);
 
   return (
     <>
+      {/* LIGHTING */}
       <directionalLight
         position={[25, 18, -25]}
         intensity={0.3}
@@ -97,25 +118,35 @@ export const Experience = () => {
         shadow-bias={-0.0001}
         shadow-radius={6}
       />
+
+      {/* MAP */}
       <Map />
-      {players.map(({ state, joystick },index) => (
+
+      {/* PLAYERS */}
+      {players.map(({ state, joystick }, index) => (
         <CharacterController
           key={state.id}
-          position-x={ index*1}
+          position-x={index * 1}
           state={state}
           joystick={joystick}
           userPlayer={state.id === myPlayer().id}
           onFire={onFire}
-          onKilled={(killer) => onKilled(state.id, killer)}
+          onKilled={(killerId) => onKilled(killerId)}
         />
       ))}
 
+      {/* BULLETS */}
       {(isHost() ? bullets : networkBullets).map((bullet) => (
-        <Bullet key={bullet.id} {...bullet} onHit={(position) => onHit(bullet.id, position)} />
+        <Bullet key={bullet.id} {...bullet} onHit={(pos) => onHit(bullet.id, pos)} />
       ))}
+
+      {/* BULLET HITS */}
       {(isHost() ? hits : networkHits).map((hit) => (
-        <BulletHit key={hit.id} {...hit} onEnded={() => onHitEnded(hit.id)} />
+        <BulletHit key={hit.id} {...hit} onEnded={() => {}} />
+        // auto-expire handled by setTimeout
       ))}
+
+      {/* ENVIRONMENT */}
       <Environment preset="sunset" />
     </>
   );

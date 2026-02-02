@@ -15,7 +15,7 @@ type Props = React.JSX.IntrinsicElements["group"] & {
   userPlayer: boolean;
   joystick: Joystick;
   onFire: (bullet: TypeBullet) => void;
-  onKilled: (id: string, killer: RigidBodyUserData["player"]) => void;
+  onKilled: (killer: string) => void;
 };
 
 const MOVE_SPEED = 6;
@@ -129,7 +129,7 @@ export const CharacterController = ({
         }
       }
     } else {
-    /* ---------- CLIENT prediction ---------- */
+      /* ---------- CLIENT prediction ---------- */
       const pos = state.getState("pos");
       const a = state.getState("angle");
       if (pos) body.setNextKinematicTranslation(pos);
@@ -179,7 +179,7 @@ export const CharacterController = ({
             state.setState("dead", false);
           }, 2000);
 
-          onKilled(state.id, data.player);
+          onKilled(data.player);
         }}
       >
         <PlayerInfo player={state} />
