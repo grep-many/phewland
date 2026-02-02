@@ -4,19 +4,33 @@ import React from "react";
 import { insertCoin, Joystick, myPlayer, onPlayerJoin, type PlayerState } from "playroomkit";
 import { FirePNG } from "@/assets";
 import { CharacterController } from "./character-controller";
+import {Bullet} from "./bullet";
 
 interface Player {
   state: PlayerState;
   joystick: Joystick;
 }
 export const Experience = () => {
-  const [players, setPlayers] = React.useState<Player[] | []>([]);
+  const [players, setPlayers] = React.useState<Player[]>([]);
+  const [bullets, setBullets] = React.useState<TypeBullet[]>([]);
+
+  const onFire = (newbullet: TypeBullet) => {
+    setBullets(
+      (bullets) =>
+        bullets.some((bullet) => bullet.id === newbullet.id) ? bullets : [...bullets, newbullet], //bullets with same id should not be registered
+    );
+  };
+
+  const onHit = (bulletId: string) => {
+    setBullets((bullets) => bullets.filter((bullet) => bullet.id !== bulletId));
+  };
+
   React.useEffect(() => {
     (async () => await insertCoin())();
     onPlayerJoin((state) => {
       const joystick = new Joystick(state, {
         type: "angular",
-        buttons: [{ id: "phew", icon: FirePNG, label: "Phew!" }],
+        buttons: [{ id: "phew", icon: FirePNG }],
       });
 
       const newPlayer = { state, joystick };
@@ -58,7 +72,12 @@ export const Experience = () => {
           state={state}
           joystick={joystick}
           userPlayer={state.id === myPlayer().id}
+          onFire={onFire}
         />
+      ))}
+
+      {bullets.map((bullet) => (
+        <Bullet key={bullet.id} {...bullet} onHit={() => onHit(bullet.id)} />
       ))}
       <Environment preset="sunset" />
     </>

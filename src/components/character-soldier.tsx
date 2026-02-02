@@ -2,7 +2,17 @@ import { SoldierGLTF } from "@/assets";
 import { useAnimations, useGLTF } from "@react-three/drei";
 import { useGraph } from "@react-three/fiber";
 import React from "react";
-import { Color, LoopOnce, Mesh, MeshStandardMaterial, Object3D, SkinnedMesh, Group } from "three";
+import {
+  Color,
+  LoopOnce,
+  Material,
+  Mesh,
+  MeshStandardMaterial,
+  Object3D,
+  SkinnedMesh,
+  Group,
+  AnimationAction,
+} from "three";
 import { SkeletonUtils } from "three-stdlib";
 
 const WEAPONS = [
@@ -20,7 +30,7 @@ const WEAPONS = [
   "Shovel",
   "Sniper",
   "Sniper_2",
-];
+] as const;
 
 type Props = {
   color?: string;
@@ -34,31 +44,44 @@ export function CharacterSoldier({
   weapon = "AK",
   ...props
 }: Props) {
-  const group = React.useRef<Group | null>(null);
+  const group = React.useRef<Group>(null);
 
   const { scene, materials, animations } = useGLTF(SoldierGLTF);
   const clone = React.useMemo(() => SkeletonUtils.clone(scene), [scene]);
   const { nodes } = useGraph(clone);
-  const { actions } = useAnimations(animations, group);
 
+  const { mixer } = useAnimations(animations, group);
+
+  /**
+   * Play animation using our own AnimationAction
+   * (never mutates hook-returned values)
+   */
   React.useEffect(() => {
-    const action = actions[animation];
-    if (!action) return;
+    if (!mixer || !group.current) return;
+
+    const root = group.current; // 👈 snapshot ref
+    const clip = animations.find((a) => a.name === animation);
+    if (!clip) return;
+
+    const action: AnimationAction = mixer.clipAction(clip, root);
+
+    if (animation === "Death") {
+      action.setLoop(LoopOnce, 1);
+      action.clampWhenFinished = true;
+    }
 
     action.reset().fadeIn(0.2).play();
+
     return () => {
       action.fadeOut(0.2);
+      action.stop();
+      mixer.uncacheAction(clip, root); // 👈 stable ref
     };
-  }, [animation, actions]);
+  }, [animation, animations, mixer]);
 
-  React.useEffect(() => {
-    const death = actions["Death"];
-    if (death) {
-      death.loop = LoopOnce;
-      death.clampWhenFinished = true;
-    }
-  }, [actions]);
-
+  /**
+   * Player color material
+   */
   const playerColorMaterial = React.useMemo(
     () =>
       new MeshStandardMaterial({
@@ -67,8 +90,10 @@ export function CharacterSoldier({
     [color],
   );
 
+  /**
+   * Weapon visibility + material overrides
+   */
   React.useEffect(() => {
-    // Hide non-selected weapons
     WEAPONS.forEach((wp) => {
       const obj = nodes[wp] as Object3D | undefined;
       if (obj) obj.visible = wp === weapon;
@@ -76,14 +101,19 @@ export function CharacterSoldier({
 
     const applyMaterial = (root: Object3D) => {
       root.traverse((child) => {
-        if ((child as Mesh).isMesh) {
-          const mesh = child as Mesh;
-          if (mesh.material && (mesh.material as any).name === "Character_Main") {
-            mesh.material = playerColorMaterial;
+        if (!(child instanceof Mesh)) return;
+
+        const material = child.material as Material | Material[];
+        const mats = Array.isArray(material) ? material : [material];
+
+        mats.forEach((mat) => {
+          if (mat.name === "Character_Main") {
+            child.material = playerColorMaterial;
           }
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-        }
+        });
+
+        child.castShadow = true;
+        child.receiveShadow = true;
       });
     };
 
@@ -93,7 +123,7 @@ export function CharacterSoldier({
   }, [nodes, clone, weapon, playerColorMaterial]);
 
   return (
-    <group {...props} ref={group} dispose={null}>
+    <group ref={group} {...props} dispose={null}>
       <group name="Scene">
         <group name="CharacterArmature">
           <primitive object={nodes.Root} />
