@@ -5,9 +5,11 @@ import React from "react";
 import { Physics } from "@react-three/rapier";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { Leaderboard } from "./components/leader-board";
+import { Loader } from "@react-three/drei";
 
 const App = () => (
   <>
+    <Loader/>
     <Leaderboard />
     <Canvas
       shadows

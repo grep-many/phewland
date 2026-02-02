@@ -1,0 +1,68 @@
+import { Instance, Instances } from "@react-three/drei";
+import { useFrame } from "@react-three/fiber";
+import { isHost } from "playroomkit";
+import React from "react";
+import { Color, MathUtils, Object3D, Vector3 } from "three";
+
+const bulletHitcolor = new Color("hotpink");
+bulletHitcolor.multiplyScalar(12);
+
+type AnimatedBoxProps = {
+  scale: number;
+  target: Vector3;
+  speed: number;
+};
+
+const AnimatedBox = ({ scale, target, speed }: AnimatedBoxProps) => {
+  const ref = React.useRef<Object3D>(null);
+  useFrame((_, delta) => {
+    if (!ref?.current) return;
+    if (ref.current.scale.x > 0) {
+      ref.current.scale.x = ref.current.scale.y = ref.current.scale.z -= speed * delta;
+    }
+    ref.current.position.lerp(target, speed);
+  });
+  return <Instance ref={ref} scale={scale} position={[0, 0, 0]} />;
+};
+
+type BulletHitProps = {
+  nb?: number;
+  position: Vector3;
+  onEnded: () => void;
+};
+
+export const BulletHit = ({ nb = 100, position, onEnded }: BulletHitProps) => {
+  const boxes = React.useMemo(
+    () =>
+      Array.from({ length: nb }, () => ({
+        target: new Vector3(
+          MathUtils.randFloat(-0.6, 0.6),
+          MathUtils.randFloat(-0.6, 0.6),
+          MathUtils.randFloat(-0.6, 0.6),
+        ),
+        scale: 0.1, //MathUtils.randFloat(0.03, 0.09),
+        speed: MathUtils.randFloat(0.1, 0.3),
+      })),
+    [nb],
+  );
+
+  React.useEffect(() => {
+    setTimeout(() => {
+      if (isHost()) {
+        onEnded();
+      }
+    }, 500);
+  }, []);
+
+  return (
+    <group position={[position.x, position.y, position.z]}>
+      <Instances>
+        <boxGeometry />
+        <meshStandardMaterial toneMapped={false} color={bulletHitcolor} />
+        {boxes.map((box, i) => (
+          <AnimatedBox key={i} {...box} />
+        ))}
+      </Instances>
+    </group>
+  );
+};

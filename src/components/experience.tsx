@@ -13,6 +13,8 @@ import {
 import { FirePNG } from "@/assets";
 import { CharacterController } from "./character-controller";
 import { Bullet } from "./bullet";
+import type { Vector3 } from "three";
+import { BulletHit } from "./bullet-hit";
 
 interface Player {
   state: PlayerState;
@@ -21,7 +23,9 @@ interface Player {
 export const Experience = () => {
   const [players, setPlayers] = React.useState<Player[]>([]);
   const [bullets, setBullets] = React.useState<TypeBullet[]>([]);
-  const [networkBullets, setNetworkBullets] = useMultiplayerState<TypeBullet[]>("bullet", []);
+  const [networkBullets, setNetworkBullets] = useMultiplayerState<TypeBullet[]>("bullets", []);
+  const [hits, setHits] = React.useState<TypeBulletHit[]>([]);
+  const [networkHits, setNetworkHits] = useMultiplayerState<TypeBulletHit[]>("hits", []);
 
   const onFire = (newbullet: TypeBullet) => {
     setBullets(
@@ -30,8 +34,13 @@ export const Experience = () => {
     );
   };
 
-  const onHit = (bulletId: string) => {
+  const onHit = (bulletId: string, position: Vector3) => {
     setBullets((bullets) => bullets.filter((bullet) => bullet.id !== bulletId));
+    setHits((hits) => [...hits, { id: bulletId, position }]);
+  };
+
+  const onHitEnded = (hitId: TypeBulletHit["id"]) => {
+    setHits((hits) => hits.filter((hit) => hit.id !== hitId));
   };
 
   const onKilled = (_victim: string, killer: string) => {
@@ -43,6 +52,10 @@ export const Experience = () => {
   React.useEffect(() => {
     setNetworkBullets(bullets);
   }, [bullets]);
+
+  React.useEffect(() => {
+    setNetworkHits(hits);
+  }, [hits]);
 
   React.useEffect(() => {
     (async () => await insertCoin())();
@@ -97,7 +110,10 @@ export const Experience = () => {
       ))}
 
       {(isHost() ? bullets : networkBullets).map((bullet) => (
-        <Bullet key={bullet.id} {...bullet} onHit={() => onHit(bullet.id)} />
+        <Bullet key={bullet.id} {...bullet} onHit={(position) => onHit(bullet.id, position)} />
+      ))}
+      {(isHost() ? hits : networkHits).map((hit) => (
+        <BulletHit key={hit.id} {...hit} onEnded={() => onHitEnded(hit.id)} />
       ))}
       <Environment preset="sunset" />
     </>

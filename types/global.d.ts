@@ -7,9 +7,15 @@ declare global {
     angle: number;
     player: string;
   };
+
   type RigidBodyUserData = {
     type: "bullet" | "player" | "environment";
     player: string;
     damage: number;
+  };
+
+  type TypeBulletHit = {
+    id: TypeBullet["id"];
+    position: TypeBullet["position"];
   };
 }
