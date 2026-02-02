@@ -1,68 +1,70 @@
-import { Instance, Instances } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { isHost } from "playroomkit";
 import React from "react";
-import { Color, MathUtils, Object3D, Vector3 } from "three";
-
-const bulletHitcolor = new Color("hotpink");
-bulletHitcolor.multiplyScalar(12);
-
-type AnimatedBoxProps = {
-  scale: number;
-  target: Vector3;
-  speed: number;
-};
-
-const AnimatedBox = ({ scale, target, speed }: AnimatedBoxProps) => {
-  const ref = React.useRef<Object3D>(null);
-  useFrame((_, delta) => {
-    if (!ref?.current) return;
-    if (ref.current.scale.x > 0) {
-      ref.current.scale.x = ref.current.scale.y = ref.current.scale.z -= speed * delta;
-    }
-    ref.current.position.lerp(target, speed);
-  });
-  return <Instance ref={ref} scale={scale} position={[0, 0, 0]} />;
-};
+import * as THREE from "three";
 
 type BulletHitProps = {
-  nb?: number;
-  position: Vector3;
-  onEnded: () => void;
+  position: THREE.Vector3;
+  direction?: THREE.Vector3; // ✅ optional
 };
 
-export const BulletHit = ({ nb = 100, position, onEnded }: BulletHitProps) => {
-  const boxes = React.useMemo(
-    () =>
-      Array.from({ length: nb }, () => ({
-        target: new Vector3(
-          MathUtils.randFloat(-0.6, 0.6),
-          MathUtils.randFloat(-0.6, 0.6),
-          MathUtils.randFloat(-0.6, 0.6),
-        ),
-        scale: 0.1, //MathUtils.randFloat(0.03, 0.09),
-        speed: MathUtils.randFloat(0.1, 0.3),
-      })),
-    [nb],
+export const BulletHit = ({ position, direction }: BulletHitProps) => {
+  const meshRef = React.useRef<THREE.InstancedMesh>(null);
+  const dummy = React.useMemo(() => new THREE.Object3D(), []);
+
+  // ✅ SAFE forward vector
+  const forward = React.useMemo(() => {
+    if (direction && direction.lengthSq() > 0) {
+      return direction.clone().normalize();
+    }
+    // fallback (never crashes)
+    return new THREE.Vector3(0, 0, 1);
+  }, [direction]);
+
+  // perpendicular axes
+  const right = React.useMemo(() => {
+    const up = Math.abs(forward.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+
+    return new THREE.Vector3().crossVectors(forward, up).normalize();
+  }, [forward]);
+
+  const up = React.useMemo(
+    () => new THREE.Vector3().crossVectors(right, forward).normalize(),
+    [right, forward],
   );
 
-  React.useEffect(() => {
-    setTimeout(() => {
-      if (isHost()) {
-        onEnded();
-      }
-    }, 500);
-  }, []);
+  // 3 perpendicular shards
+  const shards = React.useRef([
+    { dir: right.clone(), life: 1 },
+    { dir: right.clone().negate(), life: 1 },
+    { dir: up.clone(), life: 1 },
+  ]);
+
+  useFrame((_, delta) => {
+    if (!meshRef.current) return;
+
+    shards.current.forEach((s, i) => {
+      s.life = Math.max(s.life - delta * 4, 0);
+
+      dummy.position.copy(position).addScaledVector(s.dir, (1 - s.life) * 0.35);
+
+      dummy.scale.setScalar(0.04 * s.life);
+
+      dummy.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), s.dir);
+
+      dummy.updateMatrix();
+      meshRef.current!.setMatrixAt(i, dummy.matrix);
+    });
+
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
 
   return (
-    <group position={[position.x, position.y, position.z]}>
-      <Instances>
-        <boxGeometry />
-        <meshStandardMaterial toneMapped={false} color={bulletHitcolor} />
-        {boxes.map((box, i) => (
-          <AnimatedBox key={i} {...box} />
-        ))}
-      </Instances>
-    </group>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, 3]}>
+      <boxGeometry args={[1.6, 0.2, 0.2]} />
+      <meshStandardMaterial
+        toneMapped={false}
+        color={new THREE.Color("hotpink").multiplyScalar(8)}
+      />
+    </instancedMesh>
   );
 };

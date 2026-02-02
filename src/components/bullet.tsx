@@ -5,7 +5,7 @@ import { WEAPON_OFFSET } from "./character-controller";
 import { isHost } from "playroomkit";
 
 type Props = TypeBullet & {
-  onHit: ( position: Vector3) => void;
+  onHit: (position: Vector3) => void;
 };
 
 const BULLET_SPEED = 20;
@@ -17,7 +17,7 @@ const bulletMaterial = new MeshBasicMaterial({
 
 bulletMaterial.color.multiplyScalar(42);
 
-export const Bullet = ({ player, angle, position, onHit}: Props) => {
+export const Bullet = ({ player, angle, position, onHit }: Props) => {
   const rigidBodyRef = React.useRef<RapierRigidBody>(null);
 
   React.useEffect(() => {
@@ -37,12 +37,15 @@ export const Bullet = ({ player, angle, position, onHit}: Props) => {
         <RigidBody
           ref={rigidBodyRef}
           gravityScale={0}
-          sensor
-          onIntersectionEnter={(e) => {
-            if (isHost() && (e.other.rigidBody?.userData as RigidBodyUserData).type !== "bullet") {
-              rigidBodyRef.current?.setEnabled(false);
-              onHit(vec3(rigidBodyRef.current?.translation()));
-            }
+          enabledRotations={[false, false, false]}
+          onCollisionEnter={(e) => {
+            if (!isHost()) return;
+
+            const other = e.other.rigidBody?.userData as RigidBodyUserData | undefined;
+            if (other?.type === "bullet") return;
+
+            rigidBodyRef.current?.setEnabled(false);
+            onHit(vec3(rigidBodyRef.current!.translation()));
           }}
           userData={{
             type: "bullet",

@@ -33,27 +33,34 @@ export const Experience = () => {
 
   /** FIRE BULLET */
   const onFire = (newBullet: TypeBullet) => {
+    if (!isHost()) return;
+
     setBullets((prev) => (prev.some((b) => b.id === newBullet.id) ? prev : [...prev, newBullet]));
 
-    // Auto-expire bullet after 2 seconds
+    // auto-expire safety
     setTimeout(() => {
       setBullets((prev) => prev.filter((b) => b.id !== newBullet.id));
     }, 2000);
   };
-
+  
   /** BULLET HIT */
   const onHit = (bulletId: string, position: Vector3) => {
-    // Remove the bullet immediately
+    if (!isHost()) return;
+
+    // remove bullet
     setBullets((prev) => prev.filter((b) => b.id !== bulletId));
 
-    const newHit: TypeBulletHit = { id: bulletId, position };
-    setHits((prev) => [...prev, newHit]);
+    const hitId = crypto.randomUUID();
 
-    // Auto-remove hit after 0.5s
+    // spawn hit
+    setHits((prev) => [...prev, { id: hitId, position }]);
+
+    // deterministic cleanup
     setTimeout(() => {
-      setHits((prev) => prev.filter((hit) => hit.id !== bulletId));
+      setHits((prev) => prev.filter((h) => h.id !== hitId));
     }, 500);
-  };
+  };  
+  
 
   /** KILL HANDLER */
   const onKilled = (killerId: string) => {
@@ -67,12 +74,13 @@ export const Experience = () => {
 
   /** NETWORK SYNC */
   useEffect(() => {
-    setNetworkBullets(bullets);
-  }, [bullets, setNetworkBullets]);
+    if (isHost()) setNetworkBullets(bullets);
+  }, [bullets]);
 
   useEffect(() => {
-    setNetworkHits(hits);
-  }, [hits, setNetworkHits]);
+    if (isHost()) setNetworkHits(hits);
+  }, [hits]);
+  
 
   /** PLAYER JOIN LOGIC */
   useEffect(() => {
@@ -142,7 +150,7 @@ export const Experience = () => {
 
       {/* BULLET HITS */}
       {(isHost() ? hits : networkHits).map((hit) => (
-        <BulletHit key={hit.id} {...hit} onEnded={() => {}} />
+        <BulletHit key={`hit-${hit.id}`} {...hit} />
         // auto-expire handled by setTimeout
       ))}
 

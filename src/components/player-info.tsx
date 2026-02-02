@@ -1,5 +1,5 @@
 import { Billboard, Text } from "@react-three/drei";
-import type { PlayerState } from "playroomkit";
+import { myPlayer, type PlayerState } from "playroomkit";
 
 type Props = {
   player: PlayerState;
@@ -7,7 +7,10 @@ type Props = {
 
 export const PlayerInfo = ({ player }: Props) => {
   const health = player.getState("health");
-  const name = player.getState("profile").name;
+  const name =
+    myPlayer().getProfile().name === player.getProfile().name
+      ? "You"
+      : player.getState("profile").name;
 
   return (
     <Billboard position-y={2.5}>

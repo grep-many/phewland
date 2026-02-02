@@ -1,4 +1,4 @@
-import { usePlayersList } from "playroomkit";
+import { myPlayer, usePlayersList } from "playroomkit";
 
 export const Leaderboard = () => {
   const players = usePlayersList(true);
@@ -18,7 +18,11 @@ export const Leaderboard = () => {
               }}
             />
             <div className="grow">
-              <h2 className={`font-bold text-sm`}>{player.getState("profile").name}</h2>
+              <h2 className={`font-bold text-sm`}>
+                {myPlayer().getProfile().name === player.getProfile().name
+                  ? "You"
+                  : player.getState("profile").name}
+              </h2>
               <div className="flex text-sm items-center gap-4">
                 <p>🔫 {player.getState("kills")}</p>
                 <p>💀 {player.getState("deaths")}</p>
