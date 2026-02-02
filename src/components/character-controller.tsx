@@ -7,6 +7,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls } from "@react-three/drei";
 import { Crosshair } from "./crosshair";
 import { PlayerInfo } from "./player-info";
+import { useKeyboard } from "@/hooks";
 
 type Props = React.JSX.IntrinsicElements["group"] & {
   state: PlayerState;
@@ -38,6 +39,7 @@ export const CharacterController = ({
   const rigidBodyRef = React.useRef<RapierRigidBody>(null);
   const cameraControlsRef = React.useRef<CameraControls>(null);
   const lastShootRef = React.useRef<number>(0);
+  const keyboard = useKeyboard();
 
   const [animation, setAnimation] = React.useState("Idle");
 
@@ -97,7 +99,7 @@ export const CharacterController = ({
       setAnimation("Idle");
     }
 
-    if (joystick.isPressed("bullet")) {
+    if (joystick.isPressed("bullet") || keyboard.shoot) {
       if (joystick.angle() && joystick.isJoystickPressed()) {
         setAnimation("Run_Shoot");
       } else {
@@ -157,7 +159,7 @@ export const CharacterController = ({
       >
         <PlayerInfo player={state} />
         <group ref={characterRef}>
-          <CharacterSoldier color={state.getState("profile")?.color} animation={animation} />
+          <CharacterSoldier color={state.getState("profile").color}  animation={animation} />
           {userPlayer && (
             <Crosshair position={[WEAPON_OFFSET.x, WEAPON_OFFSET.y, WEAPON_OFFSET.z]} />
           )}

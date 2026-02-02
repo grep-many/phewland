@@ -32,8 +32,8 @@ const WEAPONS = [
   "Sniper_2",
 ] as const;
 
-type Props = {
-  color?: string;
+type Props = Omit<GroupProps, "color"> & {
+  color: string;
   animation?: string;
   weapon?: string;
 };

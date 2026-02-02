@@ -1,3 +1,4 @@
+import type React from "react";
 import { Vector3 } from "three";
 
 declare global {
@@ -18,4 +19,7 @@ declare global {
     id: TypeBullet["id"];
     position: TypeBullet["position"];
   };
+
+  type GroupProps = React.JSX.IntrinsicElements["group"];
+
 }

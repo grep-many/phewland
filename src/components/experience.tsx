@@ -64,18 +64,18 @@ export const Experience = () => {
       const joystick = new Joystick(state, {
         type: "angular",
         buttons: [{ id: "bullet", icon: FirePNG }],
+        keyboard: true,
       });
 
       const newPlayer = { state, joystick };
       state.setState("health", 100);
       state.setState("deaths", 0);
       state.setState("kills", 0);
-      setPlayers((players) => {
-        if (players.some((p) => p.state.id === state.id)) {
-          return players; // already added
-        }
-        return [...players, newPlayer];
-      });
+
+      setPlayers((players) =>
+        players.some((p) => p.state.id === state.id) ? players : [...players, newPlayer],
+      );
+
       state.onQuit(() => setPlayers((players) => players.filter((p) => p.state.id !== state.id)));
     });
   }, []);
@@ -98,9 +98,10 @@ export const Experience = () => {
         shadow-radius={6}
       />
       <Map />
-      {players.map(({ state, joystick }) => (
+      {players.map(({ state, joystick },index) => (
         <CharacterController
           key={state.id}
+          position-x={ index*1}
           state={state}
           joystick={joystick}
           userPlayer={state.id === myPlayer().id}
