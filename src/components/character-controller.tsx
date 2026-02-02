@@ -1,10 +1,11 @@
 import React from "react";
-import { type Group } from "three";
-import { CharacterSoldier } from "./character-soldier";
-import { isHost, type Joystick, type PlayerState } from "playroomkit";
-import { CapsuleCollider, RapierRigidBody, RigidBody, vec3 } from "@react-three/rapier";
+import { Group, Vector3 } from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { CameraControls } from "@react-three/drei";
+import { CapsuleCollider, RapierRigidBody, RigidBody, vec3 } from "@react-three/rapier";
+import { isHost, Joystick, type PlayerState } from "playroomkit";
+
+import { CharacterSoldier } from "./character-soldier";
 import { Crosshair } from "./crosshair";
 import { PlayerInfo } from "./player-info";
 import { useKeyboard } from "@/hooks";
@@ -13,18 +14,15 @@ type Props = React.JSX.IntrinsicElements["group"] & {
   state: PlayerState;
   userPlayer: boolean;
   joystick: Joystick;
-  onFire: (newBullet: TypeBullet) => void;
-  onKilled: (id: string, userData: RigidBodyUserData["player"]) => void;
+  onFire: (bullet: TypeBullet) => void;
+  onKilled: (id: string, killer: RigidBodyUserData["player"]) => void;
 };
 
-const MOVEMENT_SPEED = 200;
+const MOVE_SPEED = 6;
+const TURN_SPEED = 12;
 const FIRE_RATE = 380;
 
-export const WEAPON_OFFSET = {
-  x: -0.2,
-  y: 1.4,
-  z: 1.4,
-};
+export const WEAPON_OFFSET = { x: -0.2, y: 1.4, z: 1.4 };
 
 export const CharacterController = ({
   state,
@@ -36,134 +34,163 @@ export const CharacterController = ({
 }: Props) => {
   const groupRef = React.useRef<Group>(null);
   const characterRef = React.useRef<Group>(null);
-  const rigidBodyRef = React.useRef<RapierRigidBody>(null);
-  const cameraControlsRef = React.useRef<CameraControls>(null);
-  const lastShootRef = React.useRef<number>(0);
-  const keyboard = useKeyboard();
+  const bodyRef = React.useRef<RapierRigidBody>(null);
+  const cameraRef = React.useRef<CameraControls>(null);
 
+  const keyboard = useKeyboard();
+  const scene = useThree((s) => s.scene);
+
+  const lastShoot = React.useRef(0);
+  const moveDir = React.useRef(new Vector3());
   const [animation, setAnimation] = React.useState("Idle");
 
-  const scene = useThree((state) => state.scene);
-  const spawnRandomly = () => {
-    if (!rigidBodyRef?.current) return;
-    const spawns = [];
-
+  /* ---------------- Spawn ---------------- */
+  const spawnPoints = React.useMemo(() => {
+    const points = [];
     for (let i = 0; i < 1000; i++) {
-      const spawn = scene.getObjectByName(`spawn_${i}`);
-      if (spawn) {
-        spawns.push(spawn);
-      } else {
-        break;
-      }
+      const s = scene.getObjectByName(`spawn_${i}`);
+      if (!s) break;
+      points.push(s);
     }
+    return points;
+  }, [scene]);
 
-    const spawnPos = spawns[Math.floor(Math.random() * spawns.length)].position;
-    rigidBodyRef.current.setTranslation(spawnPos, true);
-  };
+  const spawn = React.useCallback(() => {
+    if (!bodyRef.current || !spawnPoints.length) return;
+    const s = spawnPoints[Math.floor(Math.random() * spawnPoints.length)];
+    bodyRef.current.setTranslation(s.position, true);
+  }, [spawnPoints]);
 
   React.useEffect(() => {
-    spawnRandomly();
-  }, []);
+    if (isHost()) spawn();
+  }, [spawn]);
 
+  /* ---------------- Frame ---------------- */
   useFrame((_, delta) => {
-    if (!rigidBodyRef?.current || !characterRef?.current || !cameraControlsRef?.current) return;
-    const cameraDistanceY = window.innerWidth < 1024 ? 16 : 20;
-    const cameraDistanceZ = window.innerWidth < 1024 ? 12 : 16;
-    const playerWorldPos = vec3(rigidBodyRef.current.translation());
+    const body = bodyRef.current;
+    const character = characterRef.current;
+    if (!body || !character) return;
 
-    cameraControlsRef.current.setLookAt(
-      playerWorldPos.x,
-      playerWorldPos.y + state.getState("dead") ? 12 : cameraDistanceY,
-      playerWorldPos.z + state.getState("dead") ? 12 : cameraDistanceZ,
-      playerWorldPos.x,
-      playerWorldPos.y + 1.5,
-      playerWorldPos.z,
-      true,
-    );
-
-    if (state.getState("dead")) return setAnimation("Death");
-
+    const dead = state.getState("dead");
     const angle = joystick.angle();
-    if (joystick.isJoystickPressed() && angle) {
-      setAnimation("Run");
-      characterRef.current.rotation.y = angle;
 
-      const impulse = {
-        x: Math.sin(angle) * MOVEMENT_SPEED * delta,
-        y: 0,
-        z: Math.cos(angle) * MOVEMENT_SPEED * delta,
-      };
+    // Compute once
+    const moving = joystick.isJoystickPressed() && angle !== null;
+    const shooting = joystick.isPressed("bullet") || (userPlayer && keyboard.shoot);
 
-      rigidBodyRef.current.applyImpulse(impulse, true);
-    } else {
-      setAnimation("Idle");
+    /* ---------- Camera (local player) ---------- */
+    if (userPlayer && cameraRef.current) {
+      const p = vec3(body.translation());
+      cameraRef.current.setLookAt(
+        p.x,
+        p.y + (dead ? 12 : 18),
+        p.z + (dead ? 10 : 14),
+        p.x,
+        p.y + 1.5,
+        p.z,
+        true,
+      );
     }
 
-    if (joystick.isPressed("bullet") || keyboard.shoot) {
-      if (joystick.angle() && joystick.isJoystickPressed()) {
-        setAnimation("Run_Shoot");
+    if (dead) {
+      setAnimation("Death");
+      return;
+    }
+
+    /* ---------- HOST movement and firing ---------- */
+    if (isHost()) {
+      // Movement
+      if (moving) {
+        character.rotation.y += (angle! - character.rotation.y) * TURN_SPEED * delta;
+        moveDir.current.set(Math.sin(character.rotation.y), 0, Math.cos(character.rotation.y));
+        body.setLinvel(
+          { x: moveDir.current.x * MOVE_SPEED, y: 0, z: moveDir.current.z * MOVE_SPEED },
+          true,
+        );
+        state.setState("angle", character.rotation.y);
       } else {
-        setAnimation("Idle_Shoot");
+        const v = body.linvel();
+        body.setLinvel({ x: v.x * 0.85, y: 0, z: v.z * 0.85 }, true);
       }
-      if (isHost()) {
-        if (Date.now() - lastShootRef.current > FIRE_RATE) {
-          lastShootRef.current = +new Date(); //+unary operator converts date into number
-          const newBullet = {
-            id: state.id + "-" + lastShootRef.current,
-            position: vec3(rigidBodyRef.current.translation()),
-            angle,
+
+      state.setState("pos", body.translation());
+
+      // Shooting
+      if (shooting) {
+        const now = Date.now();
+        if (now - lastShoot.current > FIRE_RATE) {
+          lastShoot.current = now;
+          onFire({
+            id: `${state.id}-${now}`,
+            position: vec3(body.translation()),
+            angle: character.rotation.y,
             player: state.id,
-          };
-          onFire(newBullet);
+          });
         }
       }
+    } else {
+    /* ---------- CLIENT prediction ---------- */
+      const pos = state.getState("pos");
+      const a = state.getState("angle");
+      if (pos) body.setNextKinematicTranslation(pos);
+      if (a !== null) character.rotation.y = a;
     }
 
-    if (isHost()) {
-      state.setState("pos", rigidBodyRef.current.translation());
-    } else {
-      const pos = state.getState("pos");
-      if (pos) {
-        rigidBodyRef.current.setTranslation(pos, true);
-      }
-    }
+    /* ---------- Animation ---------- */
+    let next = "Idle";
+    if (shooting) next = moving ? "Run_Shoot" : "Idle_Shoot";
+    else if (moving) next = "Run";
+    setAnimation((a) => (a === next ? a : next));
   });
 
+  /* ---------------- JSX ---------------- */
   return (
     <group ref={groupRef} {...props}>
-      {userPlayer && <CameraControls ref={cameraControlsRef} />}
+      {userPlayer && <CameraControls ref={cameraRef} />}
+
       <RigidBody
-        ref={rigidBodyRef}
+        ref={bodyRef}
         colliders={false}
-        linearDamping={12}
+        linearDamping={2}
         lockRotations
         type={isHost() ? "dynamic" : "kinematicPosition"}
         onIntersectionEnter={({ other }) => {
-          const userData = other.rigidBody?.userData as RigidBodyUserData;
-          if (isHost() && userData.type === "bullet" && state.getState("health") > 0) {
-            const newHealth = state.getState("health") - userData.damage;
-            if (newHealth > 0) return state.setState("health", newHealth);
-            state.setState("deaths", state.getState("deaths") + 1);
-            state.setState("dead", true);
-            state.setState("health", 0);
-            rigidBodyRef.current?.setEnabled(false);
-            setTimeout(() => {
-              spawnRandomly();
-              rigidBodyRef.current?.setEnabled(true);
-              state.setState("health", 100);
-              state.setState("dead", false);
-            }, 2000);
-            onKilled(state.id, userData.player);
+          const data = other.rigidBody?.userData as RigidBodyUserData;
+          if (!isHost() || data?.type !== "bullet") return;
+
+          const hp = state.getState("health");
+          if (hp <= 0) return;
+
+          const nextHp = hp - data.damage;
+          if (nextHp > 0) {
+            state.setState("health", nextHp);
+            return;
           }
+
+          state.setState("dead", true);
+          state.setState("health", 0);
+          state.setState("deaths", state.getState("deaths") + 1);
+          bodyRef.current?.setEnabled(false);
+
+          setTimeout(() => {
+            spawn();
+            bodyRef.current?.setEnabled(true);
+            state.setState("health", 100);
+            state.setState("dead", false);
+          }, 2000);
+
+          onKilled(state.id, data.player);
         }}
       >
         <PlayerInfo player={state} />
+
         <group ref={characterRef}>
-          <CharacterSoldier color={state.getState("profile").color}  animation={animation} />
+          <CharacterSoldier color={state.getState("profile").color} animation={animation} />
           {userPlayer && (
             <Crosshair position={[WEAPON_OFFSET.x, WEAPON_OFFSET.y, WEAPON_OFFSET.z]} />
           )}
         </group>
+
         <CapsuleCollider args={[0.7, 0.6]} position={[0, 1.28, 0]} />
       </RigidBody>
     </group>
