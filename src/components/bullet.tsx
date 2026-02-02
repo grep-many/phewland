@@ -44,7 +44,7 @@ export const Bullet = ({ player, angle, position, onHit }: Props) => {
             const other = e.other.rigidBody?.userData as RigidBodyUserData | undefined;
             if (other?.type === "bullet") return;
 
-            rigidBodyRef.current?.setEnabled(false);
+            // rigidBodyRef.current?.setEnabled(false);
             onHit(vec3(rigidBodyRef.current!.translation()));
           }}
           userData={{

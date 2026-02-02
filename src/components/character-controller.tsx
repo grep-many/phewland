@@ -22,7 +22,7 @@ const MOVE_SPEED = 6;
 const TURN_SPEED = 12;
 const FIRE_RATE = 380;
 
-export const WEAPON_OFFSET = { x: -0.2, y: 1.4, z: 1.4 };
+export const WEAPON_OFFSET = { x: -0.2, y: 1.4, z: 0.8 };
 
 export const CharacterController = ({
   state,
@@ -154,33 +154,6 @@ export const CharacterController = ({
         linearDamping={2}
         lockRotations
         type={isHost() ? "dynamic" : "kinematicPosition"}
-        onIntersectionEnter={({ other }) => {
-          const data = other.rigidBody?.userData as RigidBodyUserData;
-          if (!isHost() || data?.type !== "bullet") return;
-
-          const hp = state.getState("health");
-          if (hp <= 0) return;
-
-          const nextHp = hp - data.damage;
-          if (nextHp > 0) {
-            state.setState("health", nextHp);
-            return;
-          }
-
-          state.setState("dead", true);
-          state.setState("health", 0);
-          state.setState("deaths", state.getState("deaths") + 1);
-          bodyRef.current?.setEnabled(false);
-
-          setTimeout(() => {
-            spawn();
-            bodyRef.current?.setEnabled(true);
-            state.setState("health", 100);
-            state.setState("dead", false);
-          }, 2000);
-
-          onKilled(data.player);
-        }}
       >
         <PlayerInfo player={state} />
 
@@ -191,7 +164,37 @@ export const CharacterController = ({
           )}
         </group>
 
-        <CapsuleCollider args={[0.7, 0.6]} position={[0, 1.28, 0]} />
+        <CapsuleCollider
+          onCollisionEnter={({ other }) => {
+            const data = other.rigidBody?.userData as RigidBodyUserData;
+            if (!isHost() || data?.type !== "bullet") return;
+
+            const hp = state.getState("health");
+            if (hp <= 0) return;
+
+            const nextHp = hp - data.damage;
+            if (nextHp > 0) {
+              state.setState("health", nextHp);
+              return;
+            }
+
+            state.setState("dead", true);
+            state.setState("health", 0);
+            state.setState("deaths", state.getState("deaths") + 1);
+            bodyRef.current?.setEnabled(false);
+
+            setTimeout(() => {
+              spawn();
+              bodyRef.current?.setEnabled(true);
+              state.setState("health", 100);
+              state.setState("dead", false);
+            }, 2000);
+
+            onKilled(data.player);
+          }}
+          args={[0.7, 0.6]}
+          position={[0, 1.28, 0]}
+        />
       </RigidBody>
     </group>
   );
