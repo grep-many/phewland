@@ -9,7 +9,7 @@ import { CharacterSoldier } from "./character-soldier";
 import { Crosshair } from "./crosshair";
 import { PlayerInfo } from "./player-info";
 
-import { DeadMP3, HurtMP3, RifleMP3 } from "@/assets";
+import { DeadMP3, HurtMP3, RifleMP3, WEAPON_OFFSET } from "@/assets";
 
 type Props = React.JSX.IntrinsicElements["group"] & {
   state: PlayerState;
