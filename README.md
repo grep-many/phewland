@@ -1,5 +1,5 @@
 <h1>
-  <img src="./public/vite.svg" alt="Phewland Logo" width="42" style="vertical-align: middle;" />
+  <img src="./public/favicon.ico" alt="Phewland Logo" width="42" style="vertical-align: middle;" />
   Phewland — Multiplayer 3D Shooter Playground
 </h1>
 
